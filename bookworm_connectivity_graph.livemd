@@ -138,7 +138,21 @@ graph =
 
 Hey presto, we have a graph!
 
-But now we need to display it…
+But now we need to display it… the naive way!
+
+```elixir
+dot_output = elem(Graph.to_dot(graph), 1)
+
+IO.puts(dot_output)
+```
+
+Ordinarily we could paste that into something like [Graphviz Online](https://dreampuf.github.io/GraphvizOnline) and we'd be done, but we've exceeded the limits.
+
+Let's output a file for safekeeping.
+
+```elixir
+File.write!("#{__DIR__}/output.dot", dot_output)
+```
 
 ## References
 
