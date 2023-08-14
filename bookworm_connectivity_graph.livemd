@@ -3,7 +3,8 @@
 ```elixir
 Mix.install([
   {:req, "~> 0.3.0"},
-  {:req_easyhtml, "~> 0.1.0"}
+  {:req_easyhtml, "~> 0.1.0"},
+  {:kino_explorer, "~> 0.1.4"}
 ])
 ```
 
@@ -76,7 +77,12 @@ Anyway. Excelsior!
 ```elixir
 raw_episodes =
   Enum.map(1..most_recent_episode_number, fn num ->
-    Req.get!(req, url: "https://bookworm.fm/#{num}/").body
+    url = "https://bookworm.fm/#{num}/"
+
+    %{
+      url: url,
+      request: Req.get!(req, url: url)
+    }
   end)
 ```
 
@@ -87,9 +93,41 @@ Let's do some cleanup on this… we don't care about all the html, just the bit
 ```elixir
 episodes =
   raw_episodes
-  |> Enum.map(fn raw_html ->
-    raw_html["article"]
+  |> Enum.map(fn %{request: request} = episode ->
+    article = request.body["article"]
+
+    episode
+    |> Map.put(:article, article)
+    |> Map.put(:links, article["a"])
   end)
 ```
 
 Everytime I create one of these tiny blocks, it feels wrong to my DRY-trained programming brain, but I know from experience with Livebooks that it rewards little iterative steps.
+
+I've thought of a several different things I want to do with this:
+
+* a table of "most linked to episodes"
+* a graph showing all the links
+* transformation to markdown notes that could be stuck in someone's (*cough* Mike *cough*) Obsidian.
+
+Let's go!
+
+## Stats and Tables
+
+I thought that the first thing I'm going to need to do is to transform this list of raw bodies into something that we can actually work with and display as a table.
+
+I started to add a Smart Cell Data Explorer, which will automatically add dependencies for all it's plugins and things… but I'm running into it freaking out over the EasyHTML/Floki structs... let's go for the throat and try the graph.
+
+* https://dev.to/zorbash/a-livebook-smart-cell-to-render-diagrams-fpm
+* https://kroki.io/
+
+```elixir
+episodes
+|> Enum.map(fn ep ->
+  %{
+    url: ep[:url],
+    number_of_links: Enum.count(ep[:links])
+  }
+end)
+|> Explorer.Series.from_list()
+```
