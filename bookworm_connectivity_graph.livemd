@@ -3,24 +3,21 @@
 ```elixir
 Mix.install([
   {:req, "~> 0.3.0"},
-  {:req_easyhtml, "~> 0.1.0"},
-  {:kino_explorer, "~> 0.1.4"}
+  {:floki, "~> 0.34.0"},
+  {:kino_explorer, "~> 0.1.4"},
+  {:libgraph, "~> 0.16.0"}
 ])
 ```
 
-## Why?
+## 🤔 Why?
 
-[Bookworm](https://bookworm.fm/) is one of my favorite podcastss. Like many listeners I use it as a filter to find quality books to add to my queue. I love how the hosts don't just read but engage with the material, holding each other accountable with takeaways and challenges.
+[Bookworm](https://bookworm.fm/) is one of my favorite podcasts. Like many listeners I use it as a filter to find quality books to add to my queue. I love how the hosts don't just read but engage with the material, holding each other accountable with takeaways and challenges.
 
 A recurring joke in Bookworm is how many times they refer to [Ep. 42, How To Read a Book by Mortimer Adler](https://bookworm.fm/42/). The last few times they've made that joke… I've wanted to actually visualize that… graph. I know Mike loves Obsidian, I love Elixir and have been learning Livebook… let's play!
 
-## Scraping
+## 🎣 Scraping
 
 The first thing is to scrape the pages for processing and evaluation. One lovely thing about Livebook is that if you structure each code block separately, it intelligently memoizes each variable and only re-evaluates them if the structure changes.
-
-Bookworm's website is structured logically. The most recent episode is the top `<h2>` on the page, and every episode will be in the form `https://bookworm.fm/1/` up to `https://bookworm.fm/<current>/`.
-
-<!-- livebook:{"break_markdown":true} -->
 
 Previously, I had used [HTTPoison](https://github.com/edgurgel/httpoison) to do some downloading, but my friend [Seth](http://megalithic.io) has recommended [Req](https://github.com/wojtekmach/req), so let's give that a whirl.
 
@@ -42,35 +39,28 @@ Req.get!("https://bookworm.fm/").body
 
 Success! Let's be a little more intentional.
 
-The most recent post is the top `<h2>` on the page.
+Bookworm's website is structured logically. Every episode will be in the form `https://bookworm.fm/1/` up to `https://bookworm.fm/<current>/`. The most recent post is the top `<h2>` on the page.
 
 Adding the [req_easyhtml](https://github.com/wojtekmach/req_easyhtml) plugin to dependencies.
 
-```elixir
-req =
-  Req.new()
-  |> ReqEasyHTML.attach()
-```
+<!-- livebook:{"break_markdown":true} -->
 
 Now I can hone the CSS selector I need to get the most current link. What's really nice (again) about Livebook is that as I rerun the code over and over… I'm not pummeling my internet friends' server with requests. Livebook's cells have localized and memoized all the variables.
 
 ```elixir
 most_recent_episode_number =
-  Req.get!(req, url: "https://bookworm.fm/").body["h2:first-of-type"]["a"]
-  |> Map.to_list()
-  |> Keyword.get(:nodes)
+  Req.get!(url: "https://bookworm.fm/").body
+  |> Floki.parse_document!()
+  |> Floki.find("h2 a")
   |> List.first()
-  |> elem(1)
-  |> Map.new()
-  |> Map.get("href")
+  |> Floki.attribute("href")
+  |> List.first()
   |> String.split("/", trim: true)
   |> List.last()
   |> String.to_integer()
 ```
 
 ☝️ This is a super gross way to do this, but I can fix it later.
-
-* [ ] TODO: Fix this grossness.
 
 Anyway. Excelsior!
 
@@ -80,8 +70,9 @@ raw_episodes =
     url = "https://bookworm.fm/#{num}/"
 
     %{
+      # going to be important later! (basically the private key for the episode)
       url: url,
-      request: Req.get!(req, url: url)
+      request: Req.get!(url: url)
     }
   end)
 ```
@@ -94,11 +85,24 @@ Let's do some cleanup on this… we don't care about all the html, just the bit
 episodes =
   raw_episodes
   |> Enum.map(fn %{request: request} = episode ->
-    article = request.body["article"]
+    floki_article =
+      request.body
+      |> Floki.parse_fragment!()
+      |> Floki.find("article")
+
+    links =
+      floki_article
+      |> Floki.find("a")
+      |> Enum.map(fn link ->
+        link
+        |> Floki.attribute("href")
+        |> List.first()
+      end)
 
     episode
-    |> Map.put(:article, article)
-    |> Map.put(:links, article["a"])
+    |> Map.put(:floki_article, floki_article)
+    |> Map.put(:article, Floki.text(floki_article, sep: " "))
+    |> Map.put(:links, links)
   end)
 ```
 
@@ -112,22 +116,33 @@ I've thought of a several different things I want to do with this:
 
 Let's go!
 
-## Stats and Tables
+## 🗺️ Graphs and Maps
 
 I thought that the first thing I'm going to need to do is to transform this list of raw bodies into something that we can actually work with and display as a table.
 
 I started to add a Smart Cell Data Explorer, which will automatically add dependencies for all it's plugins and things… but I'm running into it freaking out over the EasyHTML/Floki structs... let's go for the throat and try the graph.
 
-* https://dev.to/zorbash/a-livebook-smart-cell-to-render-diagrams-fpm
-* https://kroki.io/
+I've done this before for [Advent of Code](https://adventofcode.com), so excuse the magic… 🧙
 
 ```elixir
-episodes
-|> Enum.map(fn ep ->
-  %{
-    url: ep[:url],
-    number_of_links: Enum.count(ep[:links])
-  }
-end)
-|> Explorer.Series.from_list()
+graph =
+  episodes
+  |> Enum.reduce(Graph.new(), fn episode, g ->
+    episode
+    |> Map.get(:links)
+    |> Enum.reduce(g, fn link, g ->
+      Graph.add_edge(g, Map.get(episode, :url), link)
+    end)
+  end)
 ```
+
+Hey presto, we have a graph!
+
+But now we need to display it…
+
+## References
+
+* https://hexdocs.pm/floki/Floki.html
+* https://hexdocs.pm/libgraph/Graph.html
+* https://dev.to/zorbash/a-livebook-smart-cell-to-render-diagrams-fpm
+* https://kroki.io/
