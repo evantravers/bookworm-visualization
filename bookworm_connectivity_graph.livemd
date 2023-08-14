@@ -1,0 +1,95 @@
+# Bookworm Connectivity Graph
+
+```elixir
+Mix.install([
+  {:req, "~> 0.3.0"},
+  {:req_easyhtml, "~> 0.1.0"}
+])
+```
+
+## Why?
+
+[Bookworm](https://bookworm.fm/) is one of my favorite podcastss. Like many listeners I use it as a filter to find quality books to add to my queue. I love how the hosts don't just read but engage with the material, holding each other accountable with takeaways and challenges.
+
+A recurring joke in Bookworm is how many times they refer to [Ep. 42, How To Read a Book by Mortimer Adler](https://bookworm.fm/42/). The last few times they've made that joke… I've wanted to actually visualize that… graph. I know Mike loves Obsidian, I love Elixir and have been learning Livebook… let's play!
+
+## Scraping
+
+The first thing is to scrape the pages for processing and evaluation. One lovely thing about Livebook is that if you structure each code block separately, it intelligently memoizes each variable and only re-evaluates them if the structure changes.
+
+Bookworm's website is structured logically. The most recent episode is the top `<h2>` on the page, and every episode will be in the form `https://bookworm.fm/1/` up to `https://bookworm.fm/<current>/`.
+
+<!-- livebook:{"break_markdown":true} -->
+
+Previously, I had used [HTTPoison](https://github.com/edgurgel/httpoison) to do some downloading, but my friend [Seth](http://megalithic.io) has recommended [Req](https://github.com/wojtekmach/req), so let's give that a whirl.
+
+Adding the following to the setup:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+Mix.install([
+  {:req, "~> 0.3.0"}
+])
+```
+
+Now I can see if I can hit the opening page:
+
+```elixir
+Req.get!("https://bookworm.fm/").body
+```
+
+Success! Let's be a little more intentional.
+
+The most recent post is the top `<h2>` on the page.
+
+Adding the [req_easyhtml](https://github.com/wojtekmach/req_easyhtml) plugin to dependencies.
+
+```elixir
+req =
+  Req.new()
+  |> ReqEasyHTML.attach()
+```
+
+Now I can hone the CSS selector I need to get the most current link. What's really nice (again) about Livebook is that as I rerun the code over and over… I'm not pummeling my internet friends' server with requests. Livebook's cells have localized and memoized all the variables.
+
+```elixir
+most_recent_episode_number =
+  Req.get!(req, url: "https://bookworm.fm/").body["h2:first-of-type"]["a"]
+  |> Map.to_list()
+  |> Keyword.get(:nodes)
+  |> List.first()
+  |> elem(1)
+  |> Map.new()
+  |> Map.get("href")
+  |> String.split("/", trim: true)
+  |> List.last()
+  |> String.to_integer()
+```
+
+☝️ This is a super gross way to do this, but I can fix it later.
+
+* [ ] TODO: Fix this grossness.
+
+Anyway. Excelsior!
+
+```elixir
+raw_episodes =
+  Enum.map(1..most_recent_episode_number, fn num ->
+    Req.get!(req, url: "https://bookworm.fm/#{num}/").body
+  end)
+```
+
+The first time I tried this, I forgot the trailing slash at the end of the URL and was getting tons of redirects (I'm guessing to the URI with the trailing slash.) 🤷
+
+Let's do some cleanup on this… we don't care about all the html, just the bit inside the main area.
+
+```elixir
+episodes =
+  raw_episodes
+  |> Enum.map(fn raw_html ->
+    raw_html["article"]
+  end)
+```
+
+Everytime I create one of these tiny blocks, it feels wrong to my DRY-trained programming brain, but I know from experience with Livebooks that it rewards little iterative steps.
