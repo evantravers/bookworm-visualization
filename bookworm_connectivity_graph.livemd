@@ -13,7 +13,7 @@ Mix.install([
 
 [Bookworm](https://bookworm.fm/) is one of my favorite podcasts. Like many listeners I use it as a filter to find quality books to add to my queue. I love how the hosts don't just read but engage with the material, holding each other accountable with takeaways and challenges.
 
-A recurring joke in Bookworm is how many times they refer to [Ep. 42, How To Read a Book by Mortimer Adler](https://bookworm.fm/42/). The last few times they've made that joke… I've wanted to actually visualize that… graph. I know Mike loves Obsidian, I love Elixir and have been learning Livebook… let's play!
+A recurring joke in Bookworm is how many times they refer to [Ep. 42, How To Read a Book by Mortimer Adler](https://bookworm.fm/42/). The last few times they've made that joke I've wanted to actually visualize that graph. I know Mike loves Obsidian, I love Elixir and have been learning [Livebook](https://livebook.dev/)… let's play!
 
 ## 🎣 Scraping
 
@@ -182,9 +182,55 @@ I spent some time staring at the initial visualization and realized a few things
 
 Normally I'd just keep working "down" the workbook, but to save on network calls it's easier to get the title when I'm doing the `Req.get!`.
 
+## Markdown for Obsidian
+
+Here's a relatively straightforward visualization: use [Obsidian](https://obsidian.md) to visualize the connections and make it explorable.
+
+```elixir
+map =
+  episodes
+  |> Enum.map(fn %{url: url, title: title} -> {url, String.replace(title, ":", "-")} end)
+  |> Map.new()
+
+episodes
+|> Enum.map(fn %{title: title, links: links, article: article, url: url} ->
+  safe_title = String.replace(title, ":", "-")
+
+  content = """
+  # #{title}
+
+  #{article}
+
+  ## Mentions:
+  #{Enum.reduce(links, '', fn link, str -> "#{str}\n- [[#{Map.get(map, link, link)}]]" end)}
+  """
+
+  File.write!("#{__DIR__}/episodes/#{safe_title}.md", content)
+end)
+```
+
+## ⚗️ Data
+
+```elixir
+backlinks =
+  episodes
+  |> Enum.map(fn %{title: title, url: url} ->
+    %{
+      title: title,
+      url: url,
+      backlinks: Graph.in_edges(graph, url) |> Enum.count()
+    }
+  end)
+```
+
+<!-- livebook:{"attrs":{"assign_to":null,"collect":false,"data_frame":"backlinks","data_frame_alias":"Elixir.Explorer.DataFrame","is_data_frame":false,"lazy":true,"missing_require":"Elixir.Explorer.DataFrame","operations":[{"active":true,"column":null,"data_options":{"backlinks":"integer","title":"string","url":"string"},"datalist":[],"filter":null,"operation_type":"filters","type":"string","value":null}]},"chunks":null,"kind":"Elixir.KinoExplorer.DataTransformCell","livebook_object":"smart_cell"} -->
+
+```elixir
+require Explorer.DataFrame
+backlinks |> Explorer.DataFrame.new(lazy: true)
+```
+
 ## References
 
 * https://hexdocs.pm/floki/Floki.html
 * https://hexdocs.pm/libgraph/Graph.html
-* https://dev.to/zorbash/a-livebook-smart-cell-to-render-diagrams-fpm
-* https://kroki.io/
