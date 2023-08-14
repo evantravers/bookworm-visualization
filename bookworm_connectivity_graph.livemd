@@ -99,10 +99,16 @@ episodes =
         |> List.first()
       end)
 
+    title =
+      floki_article
+      |> Floki.find("h1")
+      |> Floki.text()
+
     episode
     |> Map.put(:floki_article, floki_article)
     |> Map.put(:article, Floki.text(floki_article, sep: " "))
     |> Map.put(:links, links)
+    |> Map.put(:title, title)
   end)
 ```
 
@@ -128,6 +134,8 @@ I've done this before for [Advent of Code](https://adventofcode.com), so excuse 
 graph =
   episodes
   |> Enum.reduce(Graph.new(), fn episode, g ->
+    Graph.label_vertex(g, episode, Map.get(episode, :title))
+
     episode
     |> Map.get(:links)
     |> Enum.reduce(g, fn link, g ->
@@ -151,8 +159,25 @@ Ordinarily we could paste that into something like [Graphviz Online](https://dre
 Let's output a file for safekeeping.
 
 ```elixir
-File.write!("#{__DIR__}/output.dot", dot_output)
+File.write!("#{__DIR__}/images/output.dot", dot_output)
 ```
+
+The `output.dot` file is understandable by Graphviz tooling:
+
+```elixir
+System.shell(
+  "/opt/homebrew/bin/sfdp -Tpng #{__DIR__}/images/output.dot > #{__DIR__}/images/sfdp.png"
+)
+```
+
+This whole bit takes a long time… there's a lot of edges.
+
+I spent some time staring at the initial visualization and realized a few things would need to e straightened up above:
+
+* [ ] I need to filter out some really common noisy URLs, like libsyn and iTunes.
+* [X] I needed to get the episode title or name of the book to label those nodes, maybe set them apart visually.
+
+Normally I'd just keep working "down" the workbook, but to save on network calls it's easier to get the title when I'm doing the `Req.get!`.
 
 ## References
 
