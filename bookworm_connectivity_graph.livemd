@@ -133,14 +133,17 @@ I've done this before for [Advent of Code](https://adventofcode.com), so excuse 
 ```elixir
 graph =
   episodes
-  |> Enum.reduce(Graph.new(), fn episode, g ->
-    Graph.label_vertex(g, episode, Map.get(episode, :title))
-
-    episode
-    |> Map.get(:links)
+  |> Enum.reduce(Graph.new(), fn %{url: url, links: links}, g ->
+    links
     |> Enum.reduce(g, fn link, g ->
-      Graph.add_edge(g, Map.get(episode, :url), link)
+      Graph.add_edge(g, url, link)
     end)
+  end)
+
+graph =
+  episodes
+  |> Enum.reduce(graph, fn %{url: url, title: title}, g ->
+    Graph.label_vertex(g, url, title)
   end)
 ```
 
