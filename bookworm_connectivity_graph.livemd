@@ -41,7 +41,7 @@ Success! Let's be a little more intentional.
 
 Bookworm's website is structured logically. Every episode will be in the form `https://bookworm.fm/1/` up to `https://bookworm.fm/<current>/`. The most recent post is the top `<h2>` on the page.
 
-Adding the [req_easyhtml](https://github.com/wojtekmach/req_easyhtml) plugin to dependencies.
+I tried adding the [req_easyhtml](https://github.com/wojtekmach/req_easyhtml) plugin, but discovered that the way it wrapped Floki just made it hard for me to pass documents and fragments through a `|>` chain, so I dropped in favor of Floki.
 
 <!-- livebook:{"break_markdown":true} -->
 
