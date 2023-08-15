@@ -147,9 +147,11 @@ graph =
   end)
 ```
 
-Hey presto, we have a graph!
+Hey presto, we have a Graph object! We can now run lots of algorithms on the graph, see strongly connected components, find backlinks, all that good stuff.
 
-But now we need to display it… the naive way!
+But now we need to display it… the naive way with Graphviz!
+
+LibGraph supplies a `Graph.to_dot/1` method that graphviz can read:
 
 ```elixir
 dot_output = elem(Graph.to_dot(graph), 1)
@@ -157,7 +159,7 @@ dot_output = elem(Graph.to_dot(graph), 1)
 IO.puts(dot_output)
 ```
 
-Ordinarily we could paste that into something like [Graphviz Online](https://dreampuf.github.io/GraphvizOnline) and we'd be done, but we've exceeded the limits.
+Ordinarily we could paste that into something like [Graphviz Online](https://dreampuf.github.io/GraphvizOnline) and we'd be done, but Mike and Joe have linked a _lot_ of links.
 
 Let's output a file for safekeeping.
 
@@ -184,16 +186,19 @@ Normally I'd just keep working "down" the workbook, but to save on network calls
 
 ## Markdown for Obsidian
 
-Here's a relatively straightforward visualization: use [Obsidian](https://obsidian.md) to visualize the connections and make it explorable.
+I decided to shift course and try a straightforward and explorable visualization: use [Obsidian](https://obsidian.md) to visualize the connections.
 
 ```elixir
+System.cmd("rm", ["--rf", "#{__DIR__}/episodes"])
+System.cmd("mkdir", ["#{__DIR__}/episodes"])
+
 map =
   episodes
   |> Enum.map(fn %{url: url, title: title} -> {url, String.replace(title, ":", "-")} end)
   |> Map.new()
 
 episodes
-|> Enum.map(fn %{title: title, links: links, article: article, url: url} ->
+|> Enum.map(fn %{title: title, links: links, article: article} ->
   safe_title = String.replace(title, ":", "-")
 
   content = """
@@ -209,7 +214,19 @@ episodes
 end)
 ```
 
+This creates a folder called `episodes` wherever the `.livemd` file lives. Open that folder as a vault in Obsidian, and you'll get something like this:
+
+<!-- livebook:{"break_markdown":true} -->
+
+![](images/obsidian_graph.png)
+
+<!-- livebook:{"break_markdown":true} -->
+
+That's pretty good… but let's set up some data science-y stuff.
+
 ## ⚗️ Data
+
+Let's quickly build a list of `Map` objects that Livebook's Explorer Dataframes can understand. We'll use a Graph function on the graph object we built earlier in the workbook to find the number of vertices (links) that have an edge to the current episode… essentially how many "backlinks."
 
 ```elixir
 backlinks =
@@ -229,6 +246,14 @@ backlinks =
 require Explorer.DataFrame
 backlinks |> Explorer.DataFrame.new()
 ```
+
+👏👏👏
+
+Already some interesting insights on there… but there's so much to explore:
+
+* Could we see this plotted over a timeline?
+* Do references have a half-life, or do some books ring eternal in Mike and Joe's ears?
+* How does the episode book score relate to the number of backlinks in the future?
 
 ## References
 
