@@ -104,11 +104,21 @@ episodes =
       |> Floki.find("h1")
       |> Floki.text()
 
+    published =
+      floki_article
+      |> Floki.find(".entry-time")
+      |> Floki.attribute("datetime")
+      |> List.first()
+      |> DateTime.from_iso8601()
+      # TODO: this should be a `with` block
+      |> elem(1)
+
     episode
     |> Map.put(:floki_article, floki_article)
     |> Map.put(:article, Floki.text(floki_article, sep: " "))
     |> Map.put(:links, links)
     |> Map.put(:title, title)
+    |> Map.put(:published, published)
   end)
 ```
 
@@ -166,7 +176,7 @@ The `output.dot` file is understandable by Graphviz tooling:
 
 ```elixir
 System.shell(
-  "/opt/homebrew/bin/sfdp -Tpng #{__DIR__}/images/output.dot > #{__DIR__}/images/sfdp.png"
+  "/opt/homebrew/bin/sfdp -Tpng #{__DIR__}/images/output.dot > #{__DIR__}/images/graph.png"
 )
 ```
 
@@ -179,15 +189,26 @@ I spent some time staring at the initial visualization and realized a few things
 
 Normally I'd just keep working "down" the workbook, but to save on network calls it's easier to get the title when I'm doing the `Req.get!`.
 
+<!-- livebook:{"continue_on_error":true} -->
+
 ```elixir
 filtered_graph =
   episodes
+  |> Enum.map(fn %{links: links} = ep ->
+    Map.put(
+      ep,
+      :links,
+      links
+      # one domain
+      |> Enum.filter(&String.match?(&1, ~r/^https:\/\/bookworm\.fm/))
+    )
+  end)
   |> Enum.reduce(Graph.new(), fn %{url: url, links: links, title: title}, g ->
     links
-    |> Enum.filter(&String.match?(&1, ~r/bookworm\.fm\/\d+/))
     |> Enum.reduce(g, fn link, g ->
       Graph.add_edge(g, url, link)
     end)
+    |> Graph.label_vertex(url, title)
   end)
 ```
 
@@ -197,13 +218,9 @@ Let's see if that filtering creates a better graphviz image…
 File.write!("#{__DIR__}/images/output2.dot", elem(Graph.to_dot(filtered_graph), 1))
 
 System.shell(
-  "/opt/homebrew/bin/sfdp -Tpng #{__DIR__}/images/output2.dot > #{__DIR__}/images/sfdp2.png"
+  "/opt/homebrew/bin/sfdp -Tpng #{__DIR__}/images/output2.dot > #{__DIR__}/images/filtered.png"
 )
 ```
-
-![](images/sfdp2.png)
-
-<!-- livebook:{"break_markdown":true} -->
 
 Better… somewhere I had to cut the code for labeling the bookworm vertices, unsure why that broke. Once again, I'm sure I could pass some better options to graphviz to emulate Obsidian… orrrrr…
 
@@ -254,24 +271,21 @@ Let's quickly build a list of `Map` objects that Livebook's Explorer Dataframes 
 ```elixir
 backlinks =
   episodes
-  |> Enum.map(fn %{title: title, url: url} ->
+  |> Enum.map(fn %{title: title, url: url, published: published} ->
     %{
       title: title,
+      published: DateTime.to_iso8601(published),
       url: url,
       backlinks: Graph.in_edges(graph, url) |> Enum.count()
     }
   end)
 ```
 
-<!-- livebook:{"attrs":{"assign_to":null,"collect":true,"data_frame":"backlinks","data_frame_alias":"Elixir.Explorer.DataFrame","is_data_frame":null,"lazy":true,"missing_require":"Elixir.Explorer.DataFrame","operations":[{"active":true,"column":null,"data_options":{"backlinks":"integer","title":"string","url":"string"},"datalist":[],"filter":null,"operation_type":"filters","type":"string","value":null}]},"chunks":null,"kind":"Elixir.KinoExplorer.DataTransformCell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":{"assign_to":null,"collect":true,"data_frame":"backlinks","data_frame_alias":"Elixir.Explorer.DataFrame","is_data_frame":false,"lazy":true,"missing_require":"Elixir.Explorer.DataFrame","operations":[{"active":true,"column":null,"data_options":{"backlinks":"integer","published":"string","title":"string","url":"string"},"datalist":[],"filter":null,"operation_type":"filters","type":"string","value":null}]},"chunks":null,"kind":"Elixir.KinoExplorer.DataTransformCell","livebook_object":"smart_cell"} -->
 
 ```elixir
 require Explorer.DataFrame
-
-backlinks
-|> Explorer.DataFrame.to_lazy()
-|> Explorer.DataFrame.new(lazy: true)
-|> Explorer.DataFrame.collect()
+backlinks |> Explorer.DataFrame.new()
 ```
 
 👏👏👏
