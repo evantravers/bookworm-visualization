@@ -281,7 +281,7 @@ backlinks =
   end)
 ```
 
-<!-- livebook:{"attrs":{"assign_to":null,"collect":true,"data_frame":"backlinks","data_frame_alias":"Elixir.Explorer.DataFrame","is_data_frame":false,"lazy":true,"missing_require":"Elixir.Explorer.DataFrame","operations":[{"active":true,"column":null,"data_options":{"backlinks":"integer","published":"string","title":"string","url":"string"},"datalist":[],"filter":null,"operation_type":"filters","type":"string","value":null}]},"chunks":null,"kind":"Elixir.KinoExplorer.DataTransformCell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":{"assign_to":null,"collect":true,"data_frame":"backlinks","data_frame_alias":"Elixir.Explorer.DataFrame","is_data_frame":false,"missing_require":"Elixir.Explorer.DataFrame","operations":[{"active":true,"column":null,"data_options":{"backlinks":"integer","published":"string","title":"string","url":"string"},"datalist":[],"filter":null,"operation_type":"filters","type":"string","value":null}]},"chunks":null,"kind":"Elixir.KinoExplorer.DataTransformCell","livebook_object":"smart_cell"} -->
 
 ```elixir
 require Explorer.DataFrame
